@@ -1,0 +1,13 @@
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+
+theta = np.radians(30)
+c, s = np.cos(theta), np.sin(theta)
+R_y = np.array(((c, 0.0, s),(0.0, 1.0, 0.0),(-s, 0.0, c)))
+print(R_y)
+
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+

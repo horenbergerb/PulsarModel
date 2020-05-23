@@ -1,0 +1,33 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{bm}
+\usepackage{amssymb}
+\title{Noodling On Pulsars}
+\begin{document}
+\maketitle
+\section{The Current Loop}
+\subsection{A Current Loop in the XY-Plane}
+The model I will use is simply a loop of constant current $I$ with radius $k$ centered on the origin which is initially inclined such that the normal vector lies along the xz-plane and forms an angle $\theta$ with the z axis.\\
+We start by defining a current loop with no angle, thus a loop in the xy-plane. The current is nonzero only at points $\vec{r}=(x,y,z)$ where $z=0$ and $\vert \vec{r} \vert = k$. We can parameterize this loop with parameter $\lambda$ as $$\vec{r}(\lambda)=(k\cos{\lambda}, k\sin{\lambda}, 0)$$ for $\lambda$ from $0$ to $2\pi$. The current vector along this loop is $$\vec{I}(\lambda)=(-I\sin{\lambda}, I\cos{\lambda}, 0)$$
+\subsection{Incline and Rotation}
+To make this model more interesting, we use rotation matrices to change the plane in which the current loop lies. Consider
+$$\bm{\mathit{R}}_y(\theta)=\begin{bmatrix}
+\cos{\theta} & 0 & \sin{\theta} \\
+0 & 1 & 0 \\
+-\sin{\theta} & 0 & \cos{\theta}
+\end{bmatrix}$$
+Then $\bm{\mathit{R}}_y(\theta)\vec{r}(\lambda)$ is our inclined current loop with current $\bm{\mathit{R}}_y(\theta)\vec{I}(\lambda)$.\\
+Similarly, we will have the rotation over time about the z-axis perfomed by
+$$\bm{\mathit{R}}_z(t)=\begin{bmatrix}
+\cos{t} & -\sin{t} & 0 \\
+\sin{t} & \cos{t} & 0 \\
+0 & 0 & 1
+\end{bmatrix}$$
+Thus our time-varying parameterized loop and current are simply
+$$\bm{\mathit{R}}_z(t)\bm{\mathit{R}}_y(\theta)\vec{r}(\lambda), \quad \bm{\mathit{R}}_z(t)\bm{\mathit{R}}_y(\theta)\vec{I}(\lambda)$$.
+\subsection{Python Implementation}
+
+
+\end{document}
