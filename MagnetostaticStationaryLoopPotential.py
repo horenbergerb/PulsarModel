@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from scipy.integrate import simps
+from scipy.integrate import quad
 import copy
 
 #########
@@ -28,10 +29,7 @@ import copy
 ##IMPLEMENTATION##
 ##################
 
-#radius of loop
-k = 1.0
-#affects current magnitude (Not exactly current magnitude; i'm lazy)
-current = .1
+samples = 100
 
 #initializing loop incline matrix
 theta = np.radians(1)
@@ -39,11 +37,13 @@ c, s = np.cos(theta), np.sin(theta)
 R_y = np.array(((c, 0.0, s),(0.0, 1.0, 0.0),(-s, 0.0, c)))
 
 #gives you the coordinates of the stationary loop inclined at some angle (lamda in degrees)
-def get_loop(lamda):
+#k is radius
+def get_loop(lamda, k = 1.0):
     lamda = np.radians(lamda)
     return np.array(((k*np.cos(lamda)), (k*np.sin(lamda)), (0)))
 #gives the current vector of the stationary loop inclined at some angle
-def get_current(lamda):
+#current is current magnitude
+def get_current(lamda, current = 0.7):
     lamda = lamda+90
     lamda = np.radians(lamda)
     return np.array(((current*np.cos(lamda)), (current*np.sin(lamda)), (0)))
@@ -51,7 +51,7 @@ def get_current(lamda):
 
 #gives you the coordinates along the rotated loop
 #this is basically r(t)
-def get_loop_rotated(t=0, steps = 100):
+def get_loop_rotated(t=0, steps = 100, k = 1.0):
     #getting the rotation matrix for time t
     t = np.radians(t)
     c_1, s_1 = np.cos(t), np.sin(t)
@@ -65,7 +65,7 @@ def get_loop_rotated(t=0, steps = 100):
     step_size = 360.0/steps
     for cur in range(steps):
         lamda = step_size*cur
-        sol = R_z.dot(R_y.dot(get_loop(lamda)))
+        sol = R_z.dot(R_y.dot(get_loop(lamda, k=k)))
         x.append(sol[0])
         y.append(sol[1])
         z.append(sol[2])
@@ -111,11 +111,20 @@ def get_potential_at_r(r, current_dom, current_codom):
         else:
             to_be_integrated[x] = np.array([0,0,0])
 
-    print("TO BE INTEGRATED")
-    print(to_be_integrated)
-    print("CURRENT DOMAIN")
-    print(current_dom)
-    return simps(to_be_integrated, x=current_dom, axis=0)
+    #print("TO BE INTEGRATED")
+    #print(to_be_integrated)
+    #print("CURRENT DOMAIN")
+    #print(current_dom)
+
+    #this works. below i test a more specific method
+    return simps(to_be_integrated, dx=(3.14159*np.linalg.norm(current_dom[0])/samples), axis=0)
+
+    #this also works but is ugly
+    #x_result = simps(to_be_integrated[:,0], x=current_dom[:,0])
+    #y_result = simps(to_be_integrated[:,1], x=current_dom[:,1])
+    #z_result = simps(to_be_integrated[:,2], x=current_dom[:,2])
+    #return np.stack([x_result, y_result, z_result]).transpose()
+
 
 def debug_to_be_integrated(r, current_dom, current_codom):
     to_be_integrated = np.zeros((current_codom.shape))
@@ -130,8 +139,8 @@ def debug_to_be_integrated(r, current_dom, current_codom):
     return to_be_integrated
 
 #base data about loop coordinates and current vectors
-x,y,z,current_dom = get_loop_rotated(steps=100)
-a,b,c,current_codom = get_current_rotated(steps=100)
+x,y,z,current_dom = get_loop_rotated(steps=samples)
+a,b,c,current_codom = get_current_rotated(steps=samples)
 
 base_x,base_y,base_z = ([] for i in range(3))
 vec_x, vec_y, vec_z = ([] for i in range(3))
@@ -142,9 +151,10 @@ vec_x, vec_y, vec_z = ([] for i in range(3))
 #print(current_codom)
 
 #test case
-for cur_x in np.arange(-2.0, 2.0, .7):
-    for cur_y in np.arange(-2.0, 2.0, .7):
-        for cur_z in np.arange(-2.0, 2.0, .7):
+
+for cur_x in np.arange(-2.0, 2.0, .9):
+    for cur_y in np.arange(-2.0, 2.0, .9):
+        for cur_z in np.arange(-2.0, 2.0, .9):
         #for cur_z in [0.0]:
             cur_vec = get_potential_at_r(np.array([cur_x,cur_y,cur_z]), current_dom, current_codom)
             print(cur_vec)
@@ -155,7 +165,20 @@ for cur_x in np.arange(-2.0, 2.0, .7):
             vec_y.append(cur_vec[1])
             vec_z.append(cur_vec[2])
 
-            
+#test case
+'''
+garb_1, garb_2, garb_3, test_pts = get_loop_rotated(steps=10, k = 1.2)
+for cur in test_pts:
+    cur_vec = get_potential_at_r(cur, current_dom, current_codom)
+    print(cur_vec)
+    base_x.append(cur[0])
+    base_y.append(cur[1])
+    base_z.append(cur[2])
+    vec_x.append(cur_vec[0])
+    vec_y.append(cur_vec[1])
+    vec_z.append(cur_vec[2])
+'''
+
 fig = plt.figure()
 ax = fig.gca(projection='3d')
 #plotting the wire itself
@@ -166,11 +189,15 @@ ax.plot(x,y,z)
 #ax.quiver(x, y, z, a, b, c)
 
 #debug test
-#test_data = debug_to_be_integrated(np.array([1.5,0.0,0.0]), current_dom, current_codom)
+#test_data = debug_to_be_integrated(np.array([0.0,1.5,0.0]), current_dom, current_codom)
 #ax.quiver(x, y, z, test_data[:,0], test_data[:,1], test_data[:,2])
 
 #plotting the potential field
 #this does not look right
 ax.quiver(base_x, base_y, base_z, vec_x, vec_y, vec_z)
+
+#ax.xaxis.set_ticks([])
+#ax.yaxis.set_ticks([])
+ax.set_aspect('equal')
 
 plt.show()
