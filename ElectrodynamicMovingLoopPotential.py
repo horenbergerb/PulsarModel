@@ -6,6 +6,7 @@ from scipy.integrate import quad
 import copy
 from matplotlib.colors import Normalize
 import matplotlib.cm as cm
+from scipy.constants import c
 
 #Color stuff was implemented using this:
 #https://stackoverflow.com/questions/28420504/adding-colors-to-a-3d-quiver-plot-in-matplotlib
@@ -17,14 +18,7 @@ import matplotlib.cm as cm
 
 #still fix the tuning of the static integral (i was too lazy to think about the parameterization)
 
-#incorporate retarded time into the vector potential integral
-##so this will be easy in a static current case
-##i don't technically have to do it until i implement the loop rotation
-##so this is basically done for this implementation
-
-#implement the scalar potential (should I plot this as vector color? red to blue?)
-##the charge has a domain of the loop coordinates, but the codomain is a constant scalar
-##this should be an easier version of the vector potential since the loop is stationary
+#optimize the calculation, probably by saving copies of the current domain for every possible distanceXtime combo?
 
 ###########
 ##SUMMARY##
@@ -40,12 +34,20 @@ import matplotlib.cm as cm
 ##IMPLEMENTATION##
 ##################
 
+test_time = 0.0
+
 cmap = 'hot'
+
+#speed_light = 1.0
+speed_light = c
+
+#number of times to sample at within one revolution
+time_samples = 100
 
 samples = 100
 
 #initializing loop incline matrix
-theta = np.radians(1)
+theta = np.radians(45)
 c, s = np.cos(theta), np.sin(theta)
 R_y = np.array(((c, 0.0, s),(0.0, 1.0, 0.0),(-s, 0.0, c)))
 
@@ -84,7 +86,7 @@ def get_loop_rotated(t=0, steps = 100, k = 1.0):
         z.append(sol[2])
         vectors.append(np.array(sol))
         
-    return x,y,z,np.stack(vectors, axis=0)
+    return np.stack(vectors, axis=0)
 
 #gives you the vectors along the rotated loop
 #this is 
@@ -108,40 +110,59 @@ def get_current_rotated(t=0, steps = 100):
         z.append(sol[2])
         vectors.append(np.array(sol))
         
-    return x,y,z,np.stack(vectors, axis=0)
+    return np.stack(vectors, axis=0)
 
 #vectorized function for crunching the inside of the integral, J/|r-cur|
 def get_dist(current_dom, r):
     return np.linalg.norm(current_dom-r)
 
-def get_vec_potential_at_r(r, current_dom, current_codom):
+def get_vec_potential_at_r(r, t=0):
+    to_be_integrated = None
+    ###########################################
+    #Get current via retarded time config here#
+    ###########################################
+    current_dom = get_loop_rotated(t=t)
+    current_codom = get_current_rotated(t=t)
     to_be_integrated = np.zeros((current_codom.shape))
+
     for x in range(current_codom.shape[0]):
-        #janky catch for division by zero
         cur_dist = get_dist(current_dom[x], r)
+        retarded_current_dom = get_loop_rotated(t=t-(cur_dist/speed_light))
+        retarded_current_codom = get_current_rotated(t=t-(cur_dist/speed_light))
+        #janky catch for division by zero
         if cur_dist != 0:
-            to_be_integrated[x] = (current_codom[x][:])/cur_dist
+            to_be_integrated[x] = (retarded_current_codom[x][:])/cur_dist
         else:
             to_be_integrated[x] = np.array([0,0,0])
 
-    return simps(to_be_integrated, dx=(3.14159*np.linalg.norm(current_dom[0])/samples), axis=0)
+    return simps(to_be_integrated, dx=(3.14159*np.linalg.norm(retarded_current_dom[0])/samples), axis=0)
 
-def get_scalar_potential_at_r(r, dom, codom):
+#NOTE: Assumes constant charge along wire
+def get_scalar_potential_at_r(r, charge, t=0):
+    ###########################################
+    #Get current via retarded time config here#
+    ###########################################
+    dom = get_loop_rotated(t=t)
+    codom = charge
     to_be_integrated = np.zeros((codom.shape))
     for x in range(codom.shape[0]):
-        #janky catch for division by zero
         cur_dist = get_dist(dom[x], r)
+        retarded_dom = get_loop_rotated(t=t-(cur_dist/speed_light))
+        retarded_codom = charge
+        #janky catch for division by zero
         if cur_dist != 0:
-            to_be_integrated[x] = (codom[x])/cur_dist
+            to_be_integrated[x] = (retarded_codom[x])/cur_dist
         else:
             to_be_integrated[x] = np.array([0,0,0])
 
-    return simps(to_be_integrated, dx=(3.14159*np.linalg.norm(current_dom[0])/samples), axis=0)
+    return simps(to_be_integrated, dx=(3.14159*np.linalg.norm(retarded_dom[0])/samples), axis=0)
 
+#time sample domain
+times = np.linspace(0, 360, 360/time_samples)
 
 #base data about loop coordinates and current vectors
-x,y,z,current_dom = get_loop_rotated(steps=samples)
-a,b,c,current_codom = get_current_rotated(steps=samples)
+current_dom = get_loop_rotated(steps=samples, t=test_time)
+current_codom = get_current_rotated(steps=samples, t=test_time)
 
 #boring charge map
 charge = np.full((samples), 1.0)
@@ -157,10 +178,10 @@ for cur_x in np.arange(-2.0, 2.0, .9):
     for cur_y in np.arange(-2.0, 2.0, .9):
         for cur_z in np.arange(-2.0, 2.0, .9):
         #for cur_z in [0.0]:
-            cur_vec = get_vec_potential_at_r(np.array([cur_x,cur_y,cur_z]), current_dom, current_codom)
+            cur_vec = get_vec_potential_at_r(np.array([cur_x,cur_y,cur_z]), t=test_time)
             print(cur_vec)
 
-            scalar_pot.append(get_scalar_potential_at_r(np.array([cur_x,cur_y,cur_z]), current_dom, charge))
+            scalar_pot.append(get_scalar_potential_at_r(np.array([cur_x,cur_y,cur_z]), charge, t=test_time))
             
             base_x.append(cur_x)
             base_y.append(cur_y)
@@ -185,7 +206,7 @@ c = getattr(plt.cm, cmap)(c)
 fig = plt.figure()
 ax = fig.gca(projection='3d')
 #plotting the wire itself
-ax.plot(x,y,z)
+ax.plot(current_dom[:,0], current_dom[:,1], current_dom[:,2])
                               
 #plotting the potential field
 #not totally sure how colormap(norm(scalar_pot)) works
